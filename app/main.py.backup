@@ -1,0 +1,651 @@
+"""
+Career Compass - Main Streamlit Application
+Complete and production-ready version
+"""
+import streamlit as st
+import pandas as pd
+import sys
+import os
+from datetime import datetime
+import plotly.io as pio
+
+# Set page configuration FIRST
+st.set_page_config(
+    page_title="Career Compass AI",
+    page_icon="🧭",
+    layout="wide",
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/chm-hibatallah/career-compass-ai',
+        'Report a bug': "https://github.com/chm-hibatallah/career-compass-ai/issues",
+        'About': "# Career Compass AI\nAI-powered skill gap analysis with market forecasting."
+    }
+)
+
+# Add project root to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
+# Import project modules
+try:
+    from src.data.real_collector import RealJobCollector
+    from src.data.quality_checker import DataQualityChecker
+    from src.features.skill_extractor import SkillExtractor
+    from src.features.advanced_ontology import AdvancedSkillOntology
+    from src.analytics.market_intelligence import MarketIntelligenceEngine
+    from src.analytics.roi_calculator import ROICalculator
+    from src.analytics.career_transition import CareerTransitionSimulator
+    from app.components.dashboard import DashboardComponents
+    from app.pages.analysis import (
+        show_skill_analysis_page,
+        show_career_transition_page,
+        show_roi_calculator_page,
+        show_forecasting_page
+    )
+    from app.utils.helpers import cache_data, get_cached_data, format_currency
+    from config.settings import settings
+except ImportError as e:
+    st.error(f"Import error: {e}")
+    st.info("Please make sure all required modules are installed and paths are correct.")
+    st.stop()
+
+# Custom CSS
+def load_custom_css():
+    """Load custom CSS styles"""
+    st.markdown("""
+    <style>
+        /* Main styles */
+        .main-header {
+            font-size: 2.5rem;
+            color: #2563eb;
+            text-align: center;
+            margin-bottom: 1rem;
+            font-weight: 800;
+        }
+        
+        .sub-header {
+            font-size: 1.2rem;
+            color: #6b7280;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        /* Metric cards */
+        .metric-card {
+            background: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-left: 4px solid #2563eb;
+        }
+        
+        /* Skill cards */
+        .skill-card {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-left: 4px solid #3b82f6;
+            transition: all 0.3s ease;
+        }
+        
+        .skill-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Sidebar */
+        .sidebar .sidebar-content {
+            background: linear-gradient(180deg, #1e40af 0%, #1e3a8a 100%);
+        }
+        
+        /* Progress bars */
+        .stProgress > div > div > div > div {
+            background-color: #2563eb;
+        }
+        
+        /* Dataframe styling */
+        .dataframe {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        /* Button styling */
+        .stButton > button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-weight: 600;
+        }
+        
+        .stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Hide Streamlit branding */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        /* Custom tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 2px;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            white-space: pre-wrap;
+            background-color: #f1f5f9;
+            border-radius: 4px 4px 0px 0px;
+            gap: 1px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #2563eb;
+            color: white;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+@st.cache_resource(show_spinner=False)
+def initialize_components():
+    """Initialize all components with caching"""
+    # Initialize core components
+    collector = RealJobCollector()
+    quality_checker = DataQualityChecker()
+    skill_extractor = SkillExtractor()
+    ontology = AdvancedSkillOntology()
+    
+    # Load or collect data
+    try:
+        jobs_df = collector.load_latest_data()
+        if len(jobs_df) < 10:  # If not enough data, collect fresh
+            st.info("Collecting fresh job data...")
+            jobs_df = collector.collect_all_sources()
+    except Exception as e:
+        st.warning(f"Using simulated data due to: {e}")
+        jobs_df = collector.collect_all_sources()  # This will use simulated data
+    
+    # Clean data
+    jobs_df_clean = quality_checker.clean_dataframe(jobs_df)
+    
+    # Extract skills
+    jobs_with_skills, skill_freq = skill_extractor.extract_skills_from_dataframe(jobs_df_clean)
+    
+    # Initialize analytics engines
+    market_engine = MarketIntelligenceEngine(jobs_with_skills)
+    roi_calculator = ROICalculator(jobs_with_skills)
+    transition_simulator = CareerTransitionSimulator(jobs_with_skills, ontology)
+    
+    return {
+        'collector': collector,
+        'quality_checker': quality_checker,
+        'skill_extractor': skill_extractor,
+        'ontology': ontology,
+        'market_data': jobs_with_skills,
+        'skill_freq': skill_freq,
+        'market_engine': market_engine,
+        'roi_calculator': roi_calculator,
+        'transition_simulator': transition_simulator
+    }
+
+def show_home_page(components):
+    """Show home page with overview"""
+    st.markdown('<h1 class="main-header">🧭 Career Compass AI</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">AI-powered skill gap analysis with real-time market intelligence</p>', unsafe_allow_html=True)
+    
+    # Hero section
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.markdown("""
+        ## Welcome to Your Career Navigator
+        
+        **Career Compass** helps you:
+        
+        ✅ **Identify skill gaps** between your current profile and target roles  
+        ✅ **Calculate ROI** for learning specific technologies  
+        ✅ **Predict future trends** in the job market  
+        ✅ **Optimize learning paths** to minimize time to promotion  
+        ✅ **Simulate career transitions** with detailed roadmaps  
+        
+        ### How It Works
+        1. **Upload your profile** or manually enter skills
+        2. **Select target roles** you're interested in
+        3. **Get personalized analysis** with actionable insights
+        4. **Follow optimized learning paths** with ROI tracking
+        
+        """)
+    
+    with col2:
+        # Quick start card
+        st.markdown("""
+        <div class="metric-card">
+            <h3 style="margin-top: 0;">🚀 Quick Start</h3>
+            <p>Get started in 60 seconds:</p>
+            <ol style="padding-left: 1.2rem;">
+                <li>Go to <b>Skill Analysis</b></li>
+                <li>Enter your current skills</li>
+                <li>Select target role</li>
+                <li>Get instant insights</li>
+            </ol>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Market overview
+    st.markdown("## 📊 Current Market Overview")
+    
+    # Get market insights
+    insights = components['market_engine'].analyze_trends()
+    
+    # Display key metrics
+    cols = st.columns(4)
+    
+    with cols[0]:
+        DashboardComponents.metric_card(
+            "Total Jobs Analyzed",
+            f"{len(components['market_data']):,}",
+            "Updated today",
+            icon="📈"
+        )
+    
+    with cols[1]:
+        total_skills = len(components['skill_freq'])
+        DashboardComponents.metric_card(
+            "Unique Skills",
+            f"{total_skills:,}",
+            "In demand",
+            icon="🔧"
+        )
+    
+    with cols[2]:
+        market_health = insights['overall_market']['market_health_score']
+        DashboardComponents.metric_card(
+            "Market Health",
+            f"{market_health}/100",
+            "Very Strong" if market_health > 80 else "Good",
+            icon="💪"
+        )
+    
+    with cols[3]:
+        remote_jobs = insights['geographic_insights'].get('remote_percentage', 0)
+        DashboardComponents.metric_card(
+            "Remote Jobs",
+            f"{remote_jobs:.1f}%",
+            "Of all postings",
+            icon="🏠"
+        )
+    
+    # Top skills visualization
+    st.markdown("### 🔥 Top 10 In-Demand Skills")
+    
+    skill_trends = insights['skill_trends']
+    top_skills = list(skill_trends['top_skills'].items())[:10]
+    
+    # Create skill cards in grid
+    skill_cols = st.columns(2)
+    
+    for idx, (skill, data) in enumerate(top_skills):
+        with skill_cols[idx % 2]:
+            DashboardComponents.skill_card(
+                skill.title(),
+                level="intermediate" if data['percentage'] > 15 else "beginner",
+                demand=data['demand_level'],
+                hours=40
+            )
+    
+    # Emerging technologies
+    st.markdown("### 🚀 Emerging Technologies to Watch")
+    
+    emerging_tech = insights['emerging_tech'][:3]
+    
+    for tech in emerging_tech:
+        with st.expander(f"{tech['technology']} - Growth: {tech['growth_rate']}"):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"**Description:** {tech['description']}")
+                st.markdown(f"**Adoption Score:** {tech['adoption_score']}/100")
+            with col2:
+                st.metric("Growth", tech['growth_rate'])
+    
+    # Call to action
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("📊 Start Skill Analysis", use_container_width=True):
+            st.session_state.current_page = "Skill Analysis"
+            st.rerun()
+    
+    with col2:
+        if st.button("🎯 Analyze Career Transition", use_container_width=True):
+            st.session_state.current_page = "Career Transition"
+            st.rerun()
+    
+    with col3:
+        if st.button("💰 Calculate ROI", use_container_width=True):
+            st.session_state.current_page = "ROI Calculator"
+            st.rerun()
+
+def show_data_explorer_page(components):
+    """Show data explorer page"""
+    st.header("🔍 Data Explorer")
+    
+    st.markdown("Explore the raw job market data used in our analysis.")
+    
+    # Data filters
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        source_filter = st.multiselect(
+            "Filter by Source",
+            components['market_data']['source'].unique() if 'source' in components['market_data'].columns else [],
+            default=[]
+        )
+    
+    with col2:
+        if 'location' in components['market_data'].columns:
+            location_filter = st.multiselect(
+                "Filter by Location",
+                components['market_data']['location'].unique()[:10],  # Limit to top 10
+                default=[]
+            )
+    
+    with col3:
+        min_salary = st.number_input("Minimum Salary ($)", 0, 500000, 0)
+    
+    # Apply filters
+    filtered_data = components['market_data'].copy()
+    
+    if source_filter:
+        filtered_data = filtered_data[filtered_data['source'].isin(source_filter)]
+    
+    if 'location' in filtered_data.columns and location_filter:
+        filtered_data = filtered_data[filtered_data['location'].isin(location_filter)]
+    
+    # Show data
+    st.subheader(f"Showing {len(filtered_data)} jobs")
+    
+    # Data preview
+    tab1, tab2, tab3 = st.tabs(["📋 Job Listings", "📊 Statistics", "📈 Trends"])
+    
+    with tab1:
+        # Select columns to show
+        available_columns = ['title', 'company', 'location', 'source', 'skills', 'description']
+        columns_to_show = st.multiselect(
+            "Select columns to display",
+            [col for col in available_columns if col in filtered_data.columns],
+            default=['title', 'company', 'location', 'skills'][:3]
+        )
+        
+        if columns_to_show:
+            st.dataframe(
+                filtered_data[columns_to_show].head(100),
+                use_container_width=True,
+                height=400
+            )
+    
+    with tab2:
+        # Statistics
+        if not filtered_data.empty:
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total Jobs", len(filtered_data))
+            
+            with col2:
+                if 'company' in filtered_data.columns:
+                    st.metric("Unique Companies", filtered_data['company'].nunique())
+            
+            with col3:
+                if 'location' in filtered_data.columns:
+                    st.metric("Unique Locations", filtered_data['location'].nunique())
+            
+            # Source distribution
+            if 'source' in filtered_data.columns:
+                st.subheader("Source Distribution")
+                source_counts = filtered_data['source'].value_counts()
+                st.bar_chart(source_counts)
+    
+    with tab3:
+        # Time trends (if date column exists)
+        date_columns = [col for col in filtered_data.columns if 'date' in col.lower() or 'created' in col.lower()]
+        
+        if date_columns:
+            date_col = date_columns[0]
+            filtered_data[date_col] = pd.to_datetime(filtered_data[date_col], errors='coerce')
+            
+            # Daily counts
+            daily_counts = filtered_data[date_col].dt.date.value_counts().sort_index()
+            
+            st.subheader("Job Postings Over Time")
+            st.line_chart(daily_counts)
+        else:
+            st.info("No date information available in the filtered data")
+
+def show_about_page():
+    """Show about page"""
+    st.header("About Career Compass AI")
+    
+    st.markdown("""
+    ## 🎯 Our Mission
+    
+    Career Compass AI was created to democratize career planning by providing 
+    data-driven insights to everyone. We believe that career decisions should 
+    be based on real market data, not guesswork.
+    
+    ## 🔬 How It Works
+    
+    1. **Data Collection**: We collect job postings from multiple sources in real-time
+    2. **Skill Extraction**: Advanced NLP extracts skills from job descriptions
+    3. **Market Analysis**: Machine learning algorithms identify trends and patterns
+    4. **Personalization**: Your profile is matched against market demands
+    5. **Recommendations**: AI generates personalized learning paths and career advice
+    
+    ## 📊 Data Sources
+    
+    We use a combination of:
+    - Public job boards (GitHub Jobs, Stack Overflow, RemoteOK)
+    - Company career pages
+    - Professional networks (simulated data for development)
+    - Salary databases and industry reports
+    
+    ## 🛠️ Technology Stack
+    
+    - **Backend**: Python, FastAPI, PostgreSQL
+    - **Data Science**: pandas, scikit-learn, Plotly
+    - **Machine Learning**: NLP for skill extraction, time-series forecasting
+    - **Frontend**: Streamlit, React (future)
+    - **Deployment**: Docker, AWS/GCP, CI/CD pipelines
+    
+    ## 🤝 Contributing
+    
+    Career Compass AI is open source! We welcome contributions from:
+    - Data scientists and ML engineers
+    - Frontend and backend developers
+    - UX/UI designers
+    - Career coaches and HR professionals
+    
+    Check out our [GitHub repository](https://github.com/yourusername/career-compass-ai) for contribution guidelines.
+    
+    ## 📞 Contact
+    
+    Have questions or suggestions? Reach out to us:
+    - Email: hello@career-compass.ai
+    - GitHub: [github.com/yourusername/career-compass-ai](https://github.com/yourusername/career-compass-ai)
+    - Twitter: [@CareerCompassAI](https://twitter.com/CareerCompassAI)
+    
+    ## 📄 License
+    
+    This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+    
+    ## 🙏 Acknowledgments
+    
+    - Built during the Data Science program at [Your University]
+    - Inspired by the need for data-driven career decisions
+    - Special thanks to all our beta testers and contributors
+    """)
+
+def main():
+    """Main application function"""
+    
+    # Load custom CSS
+    load_custom_css()
+    
+    # Initialize session state
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "Home"
+    if 'user_profile' not in st.session_state:
+        st.session_state.user_profile = {
+            'skills': [],
+            'current_role': '',
+            'target_role': '',
+            'experience_years': 3
+        }
+    
+    # Sidebar
+    with st.sidebar:
+        st.image("https://img.icons8.com/color/96/000000/compass--v1.png", width=80)
+        st.title("Career Compass")
+        
+        # Navigation
+        st.markdown("### Navigation")
+        page = st.radio(
+            "Choose a page:",
+            ["🏠 Home", "📊 Skill Analysis", "🎯 Career Transition", 
+             "💰 ROI Calculator", "🔮 Forecasting", "🔍 Data Explorer", "ℹ️ About"],
+            label_visibility="collapsed"
+        )
+        
+        # Update current page
+        page_map = {
+            "🏠 Home": "Home",
+            "📊 Skill Analysis": "Skill Analysis",
+            "🎯 Career Transition": "Career Transition",
+            "💰 ROI Calculator": "ROI Calculator",
+            "🔮 Forecasting": "Forecasting",
+            "🔍 Data Explorer": "Data Explorer",
+            "ℹ️ About": "About"
+        }
+        
+        st.session_state.current_page = page_map[page]
+        
+        st.divider()
+        
+        # User profile
+        st.markdown("### Your Profile")
+        
+        with st.form("profile_form"):
+            current_role = st.selectbox(
+                "Current Role",
+                ["Data Analyst", "Software Engineer", "Student", "Other"],
+                key="sidebar_current_role"
+            )
+            
+            target_role = st.selectbox(
+                "Target Role",
+                ["Data Scientist", "Machine Learning Engineer", "Data Engineer", "Not Sure"],
+                key="sidebar_target_role"
+            )
+            
+            skills = st.multiselect(
+                "Your Skills",
+                ["Python", "SQL", "JavaScript", "AWS", "Docker", "Machine Learning",
+                 "Statistics", "Excel", "Tableau", "Git", "Linux", "Networking"],
+                key="sidebar_skills"
+            )
+            
+            if st.form_submit_button("Update Profile", type="secondary"):
+                st.session_state.user_profile.update({
+                    'current_role': current_role,
+                    'target_role': target_role,
+                    'skills': skills
+                })
+                st.success("Profile updated!")
+        
+        st.divider()
+        
+        # Data controls
+        st.markdown("### Data Controls")
+        
+        if st.button("🔄 Refresh Market Data", use_container_width=True):
+            st.cache_resource.clear()
+            st.rerun()
+        
+        # Display data stats
+        st.caption(f"Data Version: {datetime.now().strftime('%Y-%m-%d')}")
+        
+        st.divider()
+        
+        # Quick actions
+        st.markdown("### Quick Actions")
+        
+        if st.button("📄 Generate Career Report", use_container_width=True):
+            st.info("Report generation coming soon!")
+        
+        if st.button("💾 Export Your Data", use_container_width=True):
+            st.info("Export feature coming soon!")
+    
+    # Main content area
+    try:
+        # Initialize components with loading spinner
+        with st.spinner("Loading Career Compass..."):
+            components = initialize_components()
+        
+        # Show current page
+        current_page = st.session_state.current_page
+        
+        if current_page == "Home":
+            show_home_page(components)
+        elif current_page == "Skill Analysis":
+            show_skill_analysis_page(
+                components['market_data'],
+                components['skill_extractor'],
+                components['market_engine']
+            )
+        elif current_page == "Career Transition":
+            show_career_transition_page(
+                components['market_data'],
+                components['transition_simulator']
+            )
+        elif current_page == "ROI Calculator":
+            show_roi_calculator_page(
+                components['market_data'],
+                components['roi_calculator']
+            )
+        elif current_page == "Forecasting":
+            show_forecasting_page(components['market_engine'])
+        elif current_page == "Data Explorer":
+            show_data_explorer_page(components)
+        elif current_page == "About":
+            show_about_page()
+        
+        # Footer
+        st.markdown("---")
+        st.markdown(
+            """
+            <div style="text-align: center; color: #6b7280; font-size: 0.9rem;">
+                <p>🧭 Career Compass AI • Making career planning data-driven • 
+                <a href="https://github.com/yourusername/career-compass-ai" target="_blank">GitHub</a></p>
+                <p>Data updated daily • Analysis powered by real market intelligence</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        st.info("""
+        If you're seeing this error, please:
+        1. Make sure all dependencies are installed: `pip install -r requirements.txt`
+        2. Check that the data directory exists: `mkdir -p data`
+        3. Restart the application
+        
+        If the problem persists, please file an issue on GitHub.
+        """)
+
+if __name__ == "__main__":
+    main()
