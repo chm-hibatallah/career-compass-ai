@@ -1,0 +1,77 @@
+Metadata-Version: 2.4
+Name: career-compass
+Version: 0.1.0
+Summary: AI-powered skill gap analysis with market forecasting
+Author-email: Your Name <your.email@example.com>
+Project-URL: Homepage, https://github.com/YOUR_USERNAME/career-compass-ai
+Project-URL: Bug Tracker, https://github.com/YOUR_USERNAME/career-compass-ai/issues
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: plotly>=5.17.0
+Requires-Dist: streamlit>=1.28.0
+Requires-Dist: fastapi>=0.104.0
+Requires-Dist: uvicorn>=0.24.0
+Requires-Dist: sqlalchemy>=2.0.0
+Requires-Dist: beautifulsoup4>=4.12.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: tqdm>=4.66.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: pydantic>=2.5.0
+Requires-Dist: jupyter>=1.0.0
+Requires-Dist: scipy>=1.11.0
+Requires-Dist: seaborn>=0.12.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: pre-commit>=3.5.0; extra == "dev"
+Requires-Dist: jupyterlab>=4.0.0; extra == "dev"
+
+# 🧭 Career Compass AI
+
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Streamlit App](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://your-app-url.streamlit.app/)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+
+**AI-powered skill gap analysis with real-time job market intelligence and forecasting**
+
+## 🎯 Why Career Compass?
+
+Traditional career advice is generic. Career Compass uses **real-time job market data** to provide personalized, data-driven insights about:
+- **Skill gaps** between your current profile and target roles
+- **ROI of learning** specific technologies
+- **Emerging skills** before they become mainstream
+- **Optimal learning paths** to minimize time to promotion
+
+## 🚀 Features
+
+### 🔍 **Market Intelligence Engine**
+- Scrapes & analyzes 10,000+ job postings from multiple sources
+- Detects emerging technologies using trend forecasting
+- Maps company-specific tech stacks
+
+### 📈 **Personalized Skill Analysis**
+- Upload your LinkedIn profile or manually enter skills
+- Get personalized skill gap analysis
+- ROI calculation for each learning investment
+
+### 🔮 **Forecasting Capabilities**
+- Predict which skills will be in demand in 6-12 months
+- "Future-proof" scoring for technologies
+- Career transition simulation
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    A[Job Data Sources] --> B[Data Pipeline]
+    B --> C[Skill Ontology Builder]
+    C --> D[Forecasting Engine]
+    E[User Profile] --> F[Personalization Engine]
+    D --> F
+    F --> G[Interactive Dashboard]
+    G --> H[Personalized Reports]

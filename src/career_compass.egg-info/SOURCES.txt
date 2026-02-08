@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+src/career_compass.egg-info/PKG-INFO
+src/career_compass.egg-info/SOURCES.txt
+src/career_compass.egg-info/dependency_links.txt
+src/career_compass.egg-info/requires.txt
+src/career_compass.egg-info/top_level.txt
